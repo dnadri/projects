@@ -1,0 +1,317 @@
+/* @file     project2_dnadri.cpp 
+ * @author   David Nadri
+ * @date     3/15/2013
+ * @brief    File I/O with bioinformatics.
+ * @details 
+ *           Program that reads an input file (dna.txt) containing DNA sequences,
+ *  		 analyzes the input in several ways, and outputs several files containing
+ *			 various results. The max number of nucleotides in the input file
+ *			 will be 50,000.
+ * @remarks
+ *           build:     g++ project2_dnadri.cpp -o project2_dnadri.exe
+ * @remarks 
+ *           execution: ./project2_dnadri.exe
+ *
+ * INTRUCTIONS:
+ *
+ * Exon: starts with ATG & ends w/ TAA, TGA, or TAG
+ * Intron: does NOT start or stop with these condons.
+ ----------------------------------------------------
+ * EXON/INTRON SEPARATION:
+ * first exon --> exon1.txt, second exon --> exon2.txt, etc.
+ * first intron --> intron1.txt, etc.
+ 
+ ----------------------------------------------------
+ * EXON/INTRON STATS for EACH FILE (exon1stats.txt) :
+ * 1st line: number of Poly-T sequences of size 4 in exon
+ * 2nd line: number of Poly-T sequences of size 3 in exon
+ * 3rd line: size of GC content in exon
+ * NOTE: Poly-T seq. of size 4 means (AT LEAST) 4 T's
+ * Example: TTTT TTTTT TTTTTTTTTT are all of size 4
+ 
+ ----------------------------------------------------
+ * SUMMARY STATS - ONE file called: summarystats.txt :
+ * 1st line: average length of the exons 
+ (total exon nucleotides/total number of exons)
+ * 2nd line: average length of introns
+ (total intron nucleotides/total number of introns)
+ * 3rd line: average number of Poly-T size 4 in exons
+ (total Poly-T/total number of exons)
+ * 4th line: average number of Poly-T size 4 in introns
+ (total Poly-T/total number of introns)
+ * 5th line: average number of Poly-T size 3 in exons
+ (total Poly-T/total number of exons)
+ * 6th line: average number of Poly-T size 3 in introns
+ (total Poly-T/total number of introns)
+ * 7th line: average size of GC content in exons
+ (total GC count/total number of exons)
+ * 8th line: average size of GC content in introns
+ (total GC count/total number of introns)
+ =====================================================*/
+
+#include <iostream>
+#include <string>
+#include <sstream>
+#include <fstream>
+#include <iomanip>
+#include <cstdlib>
+
+using namespace std;
+
+// Declare constants that will remain same for each file
+const string dnaFile = "dna.txt";
+const string intronPrefix = "intron";
+const string exonPrefix = "exon";
+const string extension = ".txt";
+const string statInfix = "stats";
+const string summaryFilename = "summary";
+
+// Function takes 2 parameters and writes each sequence in separate files
+void writeFile(const string &filename, const string &sequence);
+
+// Function takes 4 paramters and analyzes the statistics for
+// intron and exon sequences into separate files
+// Each new set of stats is written sequentially
+void sequenceAnalysis(const string &sequence, int &numPolyT4, int &numPolyT3, int &numGC);
+
+int main()
+{
+	stringstream ss;
+	fstream f(dnaFile.c_str(), ios::in);
+	if(!f.is_open())
+	{
+		cout << "File opening failed.\n";
+		exit(1);
+	}
+	
+	// reads the dna sequence into the string
+	string sequence;
+	getline(f, sequence);
+	//close the file handle
+	f.close();
+	
+	// Initialize intron/exon counters to 0
+	// Declare the variables outside functions
+	int exonCount = 0;		//total number of exons
+	int intronCount = 0;	//total number of introns
+	string exon = "";		//the current exon sequence
+	string intron = "";		//the current intron sequence
+	bool inExon = false;	//Determines if reading for an Exon
+	
+	//Declare the variables for stats
+	int numPolyT4; // number of Poly-T sequences of size 4
+	int numPolyT3; // number of Poly-T sequences of size 3
+	int numGC; // number of GC nucleotide content
+	
+	// Initialize total stats to 0 to start from
+	// New information will be added to this total...
+	int totalExonLength = 0;
+	int totalIntronLength = 0;
+	int totalExonPolyT4 = 0;
+	int totalIntronPolyT4 = 0;
+	int totalExonPolyT3 = 0;
+	int totalIntronPolyT3 = 0;
+	int totalExonGC = 0;
+	int totalIntronGC = 0;
+	
+	// Read the codon size of at least size 3
+	while(sequence.size() >= 3)					
+	{
+		// Copies index 0-3 into codon
+		string codon = sequence.substr(0, 3);
+		
+		// Romoves codon from start of sequence
+		sequence = sequence.substr(3); 
+		
+		// Check if exon start codon & if its not in current exon
+		if(codon == "ATG" && !inExon)
+		{
+			// Change value - Indicates reading of exon
+			inExon = true;
+			// Add the start codon to the current exon
+			exon = exon + codon;
+			
+			if(intron != "")
+			{
+				// Increment intronCount to store current intron
+				// in next numbered intron file
+				intronCount++;
+				// Write the intron to file
+				// Clear string stream
+				ss.str("");
+				ss << intronPrefix << intronCount << extension;
+				
+				// ss.str() contains the current intron and the function
+				// Note: writeFile will write this intron into the next, intronCount, file
+				writeFile(ss.str(), intron);
+				
+				// Summary Stats
+				// Clear string stream to output Intron stat file now
+				ss.str("");
+				ss << intronPrefix << intronCount << statInfix << extension;
+				stringstream statData;
+				sequenceAnalysis(intron, numPolyT4, numPolyT3, numGC);
+				totalIntronPolyT4 = totalIntronPolyT4 + numPolyT4;
+				totalIntronPolyT3 = totalIntronPolyT3 + numPolyT3;
+				totalIntronGC = totalIntronGC + numGC;
+				
+				statData << numPolyT4 << endl <<numPolyT3 << endl << numGC;
+				writeFile(ss.str(), statData.str());
+				totalIntronLength = totalIntronLength + intron.length();
+				intron = "";
+			}
+		}
+		// Reading through the exon and checking for stop codon
+		else if(inExon && (codon == "TAA" || codon == "TAG" || codon == "TGA"))
+		{
+			// Indicates end of exon..exit current exon sequence & enter next
+			inExon = false;
+			// Add the end (STOP) codon to the exon too
+			exon = exon + codon;
+			// Increment the number of exons after each end of exon
+			exonCount++;
+			ss.str("");
+			// Writes each exon into sequential files with .txt extension
+			ss << exonPrefix << exonCount << extension;
+			writeFile(ss.str(), exon);
+			//Clear the stringstream to output Exon stat file
+			ss.str("");
+			ss << exonPrefix << exonCount << statInfix << extension;
+			stringstream statData;
+			sequenceAnalysis(exon, numPolyT4, numPolyT3, numGC);
+			statData << numPolyT4 << endl <<numPolyT3 << endl << numGC;
+			totalExonPolyT4 = totalExonPolyT4 + numPolyT4;
+			totalExonPolyT3 = totalExonPolyT3 + numPolyT3;
+			totalExonGC = totalExonGC + numGC;
+			writeFile(ss.str(), statData.str());
+			totalExonLength = totalExonLength + exon.length();
+			exon = "";
+		}
+		// Account for while in exon sequence and add codon to exon sequence
+		else if(inExon)	
+			exon = exon + codon;
+		// Otherwise add codon to the intron sequence
+		else
+			intron = intron + codon;
+	}
+	
+	// If exon sequence is not complete, it is an intron
+	// Add both and set as the new intron
+	if (exon != "")
+	{
+		intron = intron + exon;
+	}
+	
+	// If INTRON sequence not complete, account for leftover
+	if (intron != "")
+	{
+		intronCount++;
+		// Write intron to file
+		ss.str("");
+		ss << intronPrefix << intronCount << extension;
+		writeFile(ss.str(), intron);
+		ss.str("");
+		ss << intronPrefix << intronCount << statInfix << extension;
+		stringstream statData;
+		sequenceAnalysis(intron, numPolyT4, numPolyT3, numGC);
+		totalIntronPolyT4 = totalIntronPolyT4 + numPolyT4;
+		totalIntronPolyT3 = totalIntronPolyT3 + numPolyT3;
+		totalIntronGC = totalIntronGC + numGC;
+		statData << numPolyT4 << endl <<numPolyT3 << endl << numGC;
+		writeFile(ss.str(), statData.str());
+		totalIntronLength = totalIntronLength + intron.length();
+		intron = "";
+	}
+	
+	// Stats Summary for both exon and intron and write into file
+	// called summarystats.txt
+	// Clear stringstream to write to fill with summary stat files
+	ss.str("");
+	ss << summaryFilename << statInfix << extension;
+	
+	stringstream statData;
+	statData.precision(4);
+	
+	// Average Summary Stats:
+	// 1st line: The avg length of exons (num of nucleotides including start/stop codons
+	statData << totalExonLength * 1.0 / exonCount << endl;
+	
+	// 2nd line: The avg length of introns
+	statData << totalIntronLength * 1.0 / intronCount << endl;
+	
+	// 3rd line: The avg num of Poly-T sequences of size 4 found in the exons
+	statData << totalExonPolyT4 * 1.0 / exonCount << endl;
+	
+	// 4th line: The avg number of Poly-T sequences of size 4 found in the introns
+	statData << totalIntronPolyT4 * 1.0 / intronCount << endl;
+	
+	// 5th line: The average number of Poly-T sequences of size 3 found in the exons
+	statData << totalExonPolyT3 * 1.0 / exonCount << endl;
+	
+	// 6th line: The average number of Poly-T sequences of size 3 found in the introns
+	statData << totalIntronPolyT3 * 1.0 / intronCount << endl;
+	
+	// 7th line: The average size of the GC content in the exons
+	statData << totalExonGC * 1.0 / exonCount << endl;
+	
+	// 8th line: The average size of the GC content in the introns
+	statData << totalIntronGC * 1.0 / intronCount << endl;
+	
+	// Finally write these 8 lines into file
+	writeFile(ss.str(), statData.str());	
+	
+	// Print program results (for own reference)
+	cout << exonCount << " " << exonPrefix << " Files: " << exonPrefix << "1" << extension << " - " << exonPrefix << exonCount << extension << endl;
+	cout << exonCount << " " << exonPrefix << " Files: " << exonPrefix << "1" << statInfix << extension << " - " << exonPrefix << exonCount << statInfix << extension << endl;
+	cout << intronCount << " " << intronPrefix << " Files: " << intronPrefix << "1" << extension << " - " << intronPrefix << intronCount << extension << endl;
+	cout << intronCount << " " << intronPrefix << " Files: " << intronPrefix << "1" << statInfix << extension << " - " << intronPrefix << intronCount << statInfix << extension << endl;
+	cout << "1 " << summaryFilename << " Statistics File: " << ss.str();
+	
+	return 0;
+} // end of main
+
+// Function definition with call by reference
+// to work with new information for each run
+void writeFile(const string &filename, const string &sequence)
+{
+	fstream f(filename.c_str(), ios::out);
+	if(!f.is_open())
+	{
+		cout << "File opening failed.\n";
+		exit(1);
+	}
+	
+	f << sequence;
+	f.close();
+}
+
+// Function definition with call by reference
+// to account for new information each run
+void sequenceAnalysis(const string &sequence, int &numPolyT4, int &numPolyT3, int &GCcount)
+{
+	numPolyT4 = 0;
+	numPolyT3= 0;
+	GCcount = 0;
+	int pos = 0;
+	while((pos = sequence.find("TTTT", pos)) != string::npos)	//while can still see non overlapped TTTT
+	{
+		numPolyT4++;
+		pos = pos + 4;
+	}
+	pos = 0;
+	while((pos = sequence.find("TTT", pos)) != string::npos)	//while can still see non overlapped TTT
+	{
+		numPolyT3++;
+		pos = pos + 3;
+	}
+	
+	// Loops through entire sequence and increments GCcount for every G or C nucleotide
+	for(unsigned int i = 0; i < sequence.size(); i++)
+		
+		if (sequence[i] == 'C' || sequence[i] == 'G')
+			GCcount++;
+	
+}
+// END OF PROGRAM
+
+
