@@ -1,0 +1,190 @@
+/************** ******************************************
+ Title:			sudoku.cpp
+ Author:		David Nadri
+ Crated On:		Fri, Sep 13, 2013 -- *DUE: Oct 2
+ Description:	*Write a program to generate valid Sudoku boards. 
+				Your program should begin by placing a random 
+				number between 1 and 9 in the top left cell of the grid. 
+				It should then place other numbers in the 
+				remaining cells to satisfy the constraints of the puzzle. 
+				Your solution must be recursive. It may also use 
+				a backtracking algorithm.*
+ 
+				Program that generates valid Sudoku boards
+				by using recursive functions and backtracking
+				algorithms to solve 9x9 Sudoku boards.
+ 
+ Purpose:		To test ability to design & implement
+				recursive & backtracking algorithms. Also,
+				to improve problem solving skills.
+ 
+ Usage:			Place a number at the top-left corner of
+				the board. Pupulates the board accordingly.
+ 
+ Compilation:	g++ sudoku.cpp -o sudoku.exe
+				./sudoku.exe (run)
+ 
+ Modifications: 
+*************** ******************************************/
+/* CRME: Column, Row, & Minigrid Elimination Algorithm 
+ (Programming Sudoku by Wei-Meng Lee)
+ Scan each cell in the grid from left to right, top to bottom.
+ For each cell:
+ Set possible values for each cell to 123456789 
+ Scan its column and eliminate the values already present in the
+ column 
+ Scan its row and eliminate the values already present in the row 
+ Scan its minigrid and eliminate the values already present in the minigrid 
+ If there is only one possible value for the cell,
+ the number for the cell is confirmed until no more cells can be confirmed */
+
+#include<iostream>
+#include<cstdlib>
+#include<ctime>// rand num bet 1 and 9
+using namespace std;
+
+const int MAX_COL = 9;
+const int MAX_ROW = 9;
+const int MAX_MINI_ROW = 3;
+const int MAX_MINI_COL = 3;
+const int SOME_INVALID_NUMBER = 0;
+
+class Sudoku
+{
+	public:
+		Sudoku(); // constructor
+		int generateRandomNum();
+		void generateBoard();
+		void generateBoard(int col, int row); // overloaded function
+		bool noConflicts(int col, int row );
+		bool checkCol(int col, int row);
+		bool checkRow(int col, int row);
+		bool checkMiniGrid(); 
+		void printBoard();
+		int grid[9][9];
+};
+
+	
+// default constructor that ensures an (invalid) value in the grid.
+// sets invalid number to all positions in the grid
+Sudoku::Sudoku() {
+	for (int col = 0; col < MAX_COL; col++) {
+		for (int row = 0; row < MAX_ROW; row++) {
+			grid[col][row] = SOME_INVALID_NUMBER; 
+		}
+	} 
+}
+
+// generates random integer between 1 and 9 (inclusive)
+int Sudoku::generateRandomNum() {
+	srand((unsigned)time(NULL));
+	int randomNum = (rand() % 9) +1;
+	return randomNum;
+}
+
+bool Sudoku::noConflicts(int col, int row) {
+	
+	bool Sudoku::checkRow(col, row) { 
+	// Assumes a number has been placed in grid[col][row];
+	// checking that against all other numbers in that row
+		for (int i = 0; i < MAX_COL; i++) { 
+			if ( (i != col) && (grid[i][row] == grid[col][row]) ) { 
+			// Something else in the row has the same value  
+				return false; 
+			} // "if" end 
+		}  // "for" end 
+		
+	// All numbers checked successfully 
+		return true; 
+	}
+
+	bool Sudoku::checkCol(col, row) {
+		for (int j = 0; j < MAX_ROW; j++) {
+			if ( (j != row) && (grid[col][j] == grid[col][row]) ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	// mr is the mini-row of the minigrid being checked (3 by 3)
+	// mc is the mini-col of the minigrid being checked (3 by 3)
+	bool Sudoku::checkMiniGrid(col, row) {
+		// checking mini-COL
+		for (int mc = 0; mc < MAX_MINI_ROW; mc++) {
+			if ( (mc != row) && (grid[mc][row] == grid[col][row]) ) {
+				return false;
+			}
+			// return true; <-- remove this from here?
+			// Should only have one return true; at the end
+			// of both for loops because both mini-COL AND mini-ROW 
+			// must pass for the minigrid to be valid, correct?
+		}
+		// checking mini-ROW
+		for (int mr = 0; mr < MAX_MINI_COL; mr++) {
+			if ( (mr != col) && (grid[mr][row] == grid[col][row]) {
+				return false;
+			}
+		}
+		return true;
+	}
+} // end of noConflicts()
+
+void Sudoku::generateBoard() {
+	generateBoard(0, 0);
+}
+
+// generates the sudoku board - recursive
+void Sudoku::generateBoard(int col, int row) {
+
+	for (int col = 0; col < MAX_COL; col++) {
+		// places a random number at top-left of grid
+		if (col == 0 && row == 0) {
+			grid[col][row] = generateRandomNum();
+		}
+	
+	// ***CONFUSED ABOUT THIS PART...(++ROW, DIDNT WE GENERATE WITH 0s ALREADY?)
+	// Generated everything in this column; skip to the next row. 
+	if (col >= MAX_COL) { 
+		col = 0;            // This can happen because of the recursion below. 
+		++row; 
+	} 
+	if (row >= MAX_ROW) {  // Generated all rows & columns 
+		return true; 
+	} 
+	// Generate a number for the current row and column: 
+	grid[col][row] = generateRandomNum(); // program generates number here (instead of "XYZ"). 
+
+	// Makes sure that the row, col and mini-grid have no conflicts
+		if ( noConflicts(col, row) && generateBoard(col+1, row) ) {   // Recursive call 
+			return true; 
+		}
+	// The "if" may fail because of conflicts in the row, col & minigrid, 
+	// in which case your program may try a different number. 
+	// I do not show the code for this. 
+	// The "if" may also fail in the recursive step, in which case your program
+	// must backtrack similar to 8-queens: 
+		else { 
+			// Set row & col to a safe value so there are no more conflicts:
+			grid[col][row] = SOME_INVALID_NUMBER; 
+			return false;
+		}
+	} // end for
+} // end generateBoard
+
+/*
+void Sudoku::printBoard() {
+	cout << grid[][] << endl;
+}
+*/
+	
+int main () {
+	
+	Sudoku game;
+	game.generateBoard();
+	
+	//	game.printBoard();
+	
+	return 0; 
+}
+
